@@ -22,19 +22,19 @@ public final class DotEnv {
             return;
         }
         for (String raw : Files.readAllLines(file)) {
-            String line = raw.trim();
-            if (line.isEmpty() || line.startsWith("#")) {
-                continue;
-            }
-            int eq = line.indexOf('=');
-            if (eq <= 0) {
-                continue;
-            }
-            String key = line.substring(0, eq).trim();
-            String value = unquote(line.substring(eq + 1).trim());
-            if (System.getenv(key) == null && System.getProperty(key) == null) {
-                System.setProperty(key, value);
-            }
+            apply(raw.trim());
+        }
+    }
+
+    private static void apply(String line) {
+        int eq = line.indexOf('=');
+        if (line.isEmpty() || line.startsWith("#") || eq <= 0) {
+            return;
+        }
+        String key = line.substring(0, eq).trim();
+        String value = unquote(line.substring(eq + 1).trim());
+        if (System.getenv(key) == null && System.getProperty(key) == null) {
+            System.setProperty(key, value);
         }
     }
 

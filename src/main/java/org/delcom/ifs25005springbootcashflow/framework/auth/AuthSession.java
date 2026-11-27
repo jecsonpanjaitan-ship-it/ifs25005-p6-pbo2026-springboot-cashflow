@@ -84,7 +84,10 @@ public final class AuthSession {
 
     /** Nilai cookie "id.tandatangan" -> id bila tanda tangan sah, selain itu null. */
     private static Integer verify(String value) {
-        int dot = value == null ? -1 : value.indexOf('.');
+        if (value == null) {
+            return null;
+        }
+        int dot = value.indexOf('.');
         if (dot <= 0) {
             return null;
         }

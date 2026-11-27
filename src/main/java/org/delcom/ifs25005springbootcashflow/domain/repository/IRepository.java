@@ -5,9 +5,9 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /** Port generik CRUD. Implementasi: InMemory (unit test) dan JDBC (runtime). */
-public interface IRepository<T, ID> {
+public interface IRepository<T, K> {
 
-    Optional<T> findById(ID id);
+    Optional<T> findById(K id);
 
     List<T> findAll();
 
@@ -15,5 +15,5 @@ public interface IRepository<T, ID> {
 
     T update(T entity);
 
-    boolean deleteById(ID id);
+    boolean deleteById(K id);
 }

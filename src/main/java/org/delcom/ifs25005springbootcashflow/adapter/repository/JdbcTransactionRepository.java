@@ -20,7 +20,8 @@ import org.springframework.jdbc.support.KeyHolder;
 /** Implementasi JDBC (runtime) ITransactionRepository. */
 public class JdbcTransactionRepository implements ITransactionRepository {
 
-    private static final String COLUMNS = "id, user_id, description, amount, type, proof_path, created_at";
+    private static final String SELECT_ALL =
+            "SELECT id, user_id, description, amount, type, proof_path, created_at FROM transactions";
 
     private static final RowMapper<Transaction> MAPPER = (rs, rowNum) -> new Transaction(
             rs.getInt("id"),
@@ -60,19 +61,19 @@ public class JdbcTransactionRepository implements ITransactionRepository {
 
     @Override
     public List<Transaction> findByUserId(int userId) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM transactions WHERE user_id = ? "
+        return jdbc.query(SELECT_ALL + " WHERE user_id = ? "
                 + "ORDER BY created_at DESC, id DESC", MAPPER, userId);
     }
 
     @Override
     public Optional<Transaction> findById(Integer id) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM transactions WHERE id = ?", MAPPER, id)
+        return jdbc.query(SELECT_ALL + " WHERE id = ?", MAPPER, id)
                 .stream().findFirst();
     }
 
     @Override
     public List<Transaction> findAll() {
-        return jdbc.query("SELECT " + COLUMNS + " FROM transactions ORDER BY created_at DESC, id DESC", MAPPER);
+        return jdbc.query(SELECT_ALL + " ORDER BY created_at DESC, id DESC", MAPPER);
     }
 
     @Override

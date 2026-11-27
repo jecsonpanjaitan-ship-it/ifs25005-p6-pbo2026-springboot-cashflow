@@ -17,7 +17,7 @@ import org.springframework.jdbc.support.KeyHolder;
 /** Implementasi JDBC (runtime) IUserRepository. */
 public class JdbcUserRepository implements IUserRepository {
 
-    private static final String COLUMNS = "id, username, password_hash, full_name, role, photo_path";
+    private static final String SELECT_ALL = "SELECT id, username, password_hash, full_name, role, photo_path FROM users";
 
     private static final RowMapper<User> MAPPER = (rs, rowNum) -> new User(
             rs.getInt("id"),
@@ -51,18 +51,18 @@ public class JdbcUserRepository implements IUserRepository {
 
     @Override
     public Optional<User> findByUsername(String username) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM users WHERE username = ?", MAPPER, username)
+        return jdbc.query(SELECT_ALL + " WHERE username = ?", MAPPER, username)
                 .stream().findFirst();
     }
 
     @Override
     public Optional<User> findById(Integer id) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM users WHERE id = ?", MAPPER, id).stream().findFirst();
+        return jdbc.query(SELECT_ALL + " WHERE id = ?", MAPPER, id).stream().findFirst();
     }
 
     @Override
     public List<User> findAll() {
-        return jdbc.query("SELECT " + COLUMNS + " FROM users ORDER BY id", MAPPER);
+        return jdbc.query(SELECT_ALL + " ORDER BY id", MAPPER);
     }
 
     @Override
