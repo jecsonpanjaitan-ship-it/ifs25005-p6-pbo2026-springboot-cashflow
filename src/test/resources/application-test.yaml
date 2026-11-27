@@ -1,0 +1,15 @@
+# Profil tes JDBC: H2 in-memory (bukan PostgreSQL).
+spring:
+  datasource:
+    url: jdbc:h2:mem:cashflow_test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+app:
+  root-username: admin
+  root-password: admin
+  upload-dir: target/test-uploads
+  openai:
+    endpoint: http://localhost:0
+    key: test
+    model: test
