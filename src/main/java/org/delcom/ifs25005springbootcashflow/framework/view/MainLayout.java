@@ -10,6 +10,7 @@ import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.menubar.MenuBar;
@@ -30,11 +31,15 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
     private final SideNav nav = new SideNav();
     private final Avatar avatar = new Avatar();
     private final Span nameLabel = new Span();
+    private final Main main = new Main();
 
     public MainLayout(IUserRepository userRepository, FileStorage storage) {
         this.userRepository = userRepository;
         this.storage = storage;
         setPrimarySection(Section.DRAWER);
+
+        main.setHeightFull();
+        setContent(main);
 
         H1 title = new H1("Cashflow");
         title.addClassName("app-title");
@@ -53,17 +58,18 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         bar.setAlignItems(FlexComponent.Alignment.CENTER);
         bar.expand(title);
         bar.addClassName("app-bar");
+        bar.getElement().setAttribute("role", "banner");
         addToNavbar(bar);
 
         addToDrawer(nav);
     }
 
-    /** Konten view anak dijadikan landmark utama (satu per halaman). */
+    /** Konten view anak ditempatkan di dalam landmark utama {@code <main>} milik layout. */
     @Override
     public void showRouterLayoutContent(HasElement content) {
-        super.showRouterLayoutContent(content);
+        main.removeAll();
         if (content != null) {
-            content.getElement().setAttribute("role", "main");
+            main.getElement().appendChild(content.getElement());
         }
     }
 
