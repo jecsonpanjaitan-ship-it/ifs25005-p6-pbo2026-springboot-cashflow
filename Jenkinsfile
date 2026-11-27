@@ -9,6 +9,13 @@ pipeline {
         skipStagesAfterUnstable()
     }
 
+    environment {
+        MAVEN_OPTS = '-Xmx2g'
+        JAVA_TOOL_OPTIONS = '-Dfile.encoding=UTF-8'
+        // Cache Maven bersama di volume Jenkins, persist antar build/job (hindari 429)
+        MAVEN_LOCAL_REPO = '/var/jenkins_home/.m2/repository'
+    }
+
     stages {
 
         // ============================================================
@@ -17,7 +24,7 @@ pipeline {
         stage('Checkout') {
             agent {
                 docker {
-                    image 'oven/bun:alpine'
+                    image 'alpine:3.21'
                     reuseNode true
                 }
             }
@@ -28,13 +35,14 @@ pipeline {
         }
 
         // ============================================================
-        // INSTALL DEPENDENCIES
+        // BUILD & TEST (Maven + Jacoco 100%)
         // ============================================================
-        stage('Install Dependencies') {
+        stage('Build & Test') {
             agent {
                 docker {
-                    image 'oven/bun:alpine'
+                    image 'eclipse-temurin:25-jdk'
                     reuseNode true
+                    args '-u root -v /var/jenkins_home/.m2:/var/jenkins_home/.m2'
                 }
             }
 
@@ -42,36 +50,40 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "=== Installing Dependencies ==="
+                    echo "=== Java Runtime ==="
+                    java -version
 
-                    bun install
+                    chmod +x mvnw
+                    mkdir -p "$MAVEN_LOCAL_REPO"
 
-                    echo "=== Dependencies Installed ==="
+                    if [ ! -f .env ]; then
+                        cp .env.example .env
+                    fi
+
+                    echo "=== Maven Clean Verify (Jacoco 100%) ==="
+                    # verify = test + jacoco:check (instruction/branch/line/method/class = 100%)
+                    # -Pproduction = Vaadin frontend production build saat package
+                    # cache Maven persisten agar tidak download ulang (hindari 429 Maven Central)
+                    ./mvnw -B clean verify -Pproduction \
+                        -Dmaven.repo.local="$MAVEN_LOCAL_REPO"
+
+                    echo "=== Build & Tests Passed ==="
+                    ls -lh target/*.jar || true
+                    ls -lh target/site/jacoco/jacoco.xml || true
                 '''
             }
-        }
 
-        // ============================================================
-        // TEST
-        // ============================================================
-        stage('Test') {
-            agent {
-                docker {
-                    image 'node:24-alpine'
-                    reuseNode true
+            post {
+                always {
+                    junit(
+                        allowEmptyResults: true,
+                        testResults: 'target/surefire-reports/*.xml'
+                    )
+                    archiveArtifacts(
+                        artifacts: 'target/site/jacoco/**',
+                        allowEmptyArchive: true
+                    )
                 }
-            }
-
-            steps {
-                sh '''
-                    set -e
-
-                    echo "=== Running Tests with Coverage ==="
-
-                    npx vitest run --coverage
-
-                    echo "=== Tests Passed ==="
-                '''
             }
         }
 
@@ -81,13 +93,14 @@ pipeline {
         stage('Trivy Security Scan') {
             agent {
                 docker {
-                    image 'aquasec/trivy:0.74.0'
+                    image 'aquasec/trivy:0.76.1'
                     reuseNode true
 
                     args '''
                         --entrypoint=""
                         -e HOME=/tmp
                         -e XDG_CACHE_HOME=/tmp/.cache
+                        -v /var/jenkins_home/.m2:/var/jenkins_home/.m2
                     '''
                 }
             }
@@ -98,6 +111,11 @@ pipeline {
 
                     mkdir -p .trivy-cache || true
 
+                    # Trivy Java analyzer membaca ~/.m2; HOME container = /tmp.
+                    # Arahkan ke cache Maven bersama yang persist di volume Jenkins.
+                    mkdir -p /tmp/.m2
+                    ln -sfn "$MAVEN_LOCAL_REPO" /tmp/.m2/repository
+
                     echo "======================================"
                     echo "        TRIVY SECURITY SCAN"
                     echo "======================================"
@@ -105,12 +123,20 @@ pipeline {
                     echo "=== Trivy Version ==="
                     trivy --version
 
+                    echo "=== Local Maven cache ==="
+                    ls -ld "$MAVEN_LOCAL_REPO" /tmp/.m2/repository || true
+
                     echo "=== Trivy Scan ==="
 
                     trivy fs \
                         --cache-dir .trivy-cache \
                         --scanners vuln \
                         --severity HIGH,CRITICAL \
+                        --offline-scan \
+                        --skip-dirs target \
+                        --skip-dirs .mvn \
+                        --skip-dirs node_modules \
+                        --skip-dirs .trivy-cache \
                         --format sarif \
                         --output trivy-results.sarif \
                         --exit-code 1 \
@@ -160,7 +186,10 @@ pipeline {
 
                         echo "=== SonarQube Analysis ==="
 
-                        sonar-scanner
+                        sonar-scanner \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.java.test.binaries=target/test-classes \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
                         echo "=== SonarQube Analysis Completed ==="
                     '''
@@ -180,12 +209,12 @@ pipeline {
         }
 
         // ============================================================
-        // PACKAGE APPLICATION
+        // PACKAGE APPLICATION (Spring Boot JAR)
         // ============================================================
         stage('Package Application') {
             agent {
                 docker {
-                    image 'node:24-alpine'
+                    image 'eclipse-temurin:25-jdk'
                     reuseNode true
                     args '-u root'
                 }
@@ -199,26 +228,32 @@ pipeline {
                     echo "       CREATING APPLICATION PACKAGE"
                     echo "======================================"
 
-                    apk add --no-cache zip unzip
+                    apt-get update -qq
+                    apt-get install -y -qq zip unzip git >/dev/null
 
-                    rm -f latest-app.zip
+                    rm -f latest-app.zip app.jar
 
-                    zip -r latest-app.zip . \
-                        -x "node_modules/*" \
-                        -x ".git/*" \
-                        -x ".env" \
-                        -x ".env.*" \
-                        -x "coverage/*" \
-                        -x ".trivy-cache/*" \
-                        -x "latest-app.zip" \
-                        -x "trivy-results.sarif"
+                    # Ambil fat JAR Spring Boot (abaikan *.jar.original)
+                    JAR="$(ls -1 target/*-SNAPSHOT.jar 2>/dev/null | grep -v '\\.original$' | head -n 1 || true)"
+                    if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+                        echo "ERROR: Spring Boot JAR tidak ditemukan di target/"
+                        ls -la target || true
+                        exit 1
+                    fi
+
+                    echo "Using JAR: $JAR"
+                    cp "$JAR" app.jar
+
+                    # ZIP bersih seperti hasil clone GitHub (hanya file tracked),
+                    # lalu tambahkan JAR hasil build di target/ agar deploy zip
+                    # berperilaku sama dengan deploy git.
+                    git -c safe.directory="$PWD" archive --format=zip --output=latest-app.zip HEAD
+                    zip -q latest-app.zip "$JAR"
 
                     echo "=== Application Package Created ==="
-
-                    ls -lh latest-app.zip
+                    ls -lh latest-app.zip app.jar
 
                     echo "=== Package Content ==="
-
                     unzip -l latest-app.zip
                 '''
             }
@@ -236,7 +271,7 @@ pipeline {
                 // ========================================================
 
                 archiveArtifacts(
-                    artifacts: 'latest-app.zip',
+                    artifacts: 'latest-app.zip,app.jar',
                     fingerprint: true,
                     allowEmptyArchive: false
                 )
@@ -268,18 +303,18 @@ pipeline {
                         echo "       PUBLISHING USER CONTENT"
                         echo "======================================"
 
-                        docker exec cicd-jenkins \
-                            mkdir -p \
+                        docker exec cicd-jenkins \\
+                            mkdir -p \\
                             "/var/jenkins_home/userContent/applications/${appName}/${buildId}"
 
-                        docker cp \
-                            latest-app.zip \
+                        docker cp \\
+                            latest-app.zip \\
                             "cicd-jenkins:/var/jenkins_home/userContent/applications/${appName}/${buildId}/latest-app.zip"
 
                         echo "=== Published File ==="
 
-                        docker exec cicd-jenkins \
-                            ls -lh \
+                        docker exec cicd-jenkins \\
+                            ls -lh \\
                             "/var/jenkins_home/userContent/applications/${appName}/${buildId}/latest-app.zip"
                     """
 
@@ -491,7 +526,7 @@ pipeline {
             echo "=========================================="
             echo "Result: ${currentBuild.currentResult}"
             echo "📦 Artifact: ${env.ARTIFACT_URL ?: '(not published)'}"
-            echo "🚀 Website berhasil dideploy."
+            echo "🚀 Aplikasi Spring Boot berhasil dideploy."
         }
 
         failure {
