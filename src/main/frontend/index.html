@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cashflow</title>
+    <style>
+        html, body, #outlet {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+        }
+
+        @supports (-webkit-touch-callout: none) {
+            @media (display-mode: standalone) {
+                html {
+                    height: 100lvh;
+                }
+            }
+        }
+
+        /* Placeholder statis: tampil seketika sebelum aplikasi Vaadin selesai dimuat. */
+        #boot {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            background: #f8fafc;
+            color: #1e293b;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            pointer-events: none;
+        }
+        #boot h1 { margin: 0; font-size: 1.75rem; }
+        #boot p { margin: 0; color: #475569; }
+    </style>
+    <!-- index.ts is included here automatically (either by the dev server or during the build) -->
+</head>
+<body>
+<main id="boot">
+    <h1>Cashflow</h1>
+    <p>Memuat aplikasi...</p>
+</main>
+
+<!-- This outlet div is where the views are rendered -->
+<div id="outlet"></div>
+
+<script>
+    (function () {
+        var boot = document.getElementById('boot');
+        var indicatorDone = false;
+
+        function finish() {
+            if (boot) { boot.remove(); boot = null; }
+        }
+
+        function check() {
+            // Indikator koneksi bawaan Vaadin berada di luar landmark: jadikan live region.
+            if (!indicatorDone) {
+                var ci = document.querySelector('vaadin-connection-indicator');
+                if (ci) {
+                    ci.setAttribute('aria-live', 'polite');
+                    indicatorDone = true;
+                }
+            }
+            // Hapus placeholder setelah landmark utama aplikasi tersedia.
+            if (boot && document.querySelector('#outlet main, #outlet [role="main"]')) {
+                finish();
+            }
+            if (!boot && indicatorDone) {
+                observer.disconnect();
+            }
+        }
+
+        var observer = new MutationObserver(check);
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(finish, 10000); // jaring pengaman
+    })();
+</script>
+</body>
+</html>
