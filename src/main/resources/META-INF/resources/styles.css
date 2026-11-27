@@ -109,3 +109,6 @@ vaadin-dialog-overlay.cf-dialog::part(footer) {
 .preview-scroller { max-height: 70vh; overflow: auto; text-align: center; }
 .preview-image { width: 100%; max-width: none; cursor: zoom-in; transition: width 0.15s ease; }
 .proof-upload { display: flex; flex-direction: column; gap: var(--lumo-space-xs); width: 100%; }
+
+/* H1 pada halaman login/daftar: ukuran visual dijaga seperti sebelumnya (H2) */
+.auth-title { font-size: var(--lumo-font-size-xxl); margin: 0 0 var(--lumo-space-s); }

@@ -15,6 +15,7 @@ public class LoadingIndicatorInitListener implements VaadinServiceInitListener {
             config.setFirstDelay(150);
             config.setSecondDelay(600);
             config.setThirdDelay(1500);
+            uiEvent.getUI().getPage().executeJs("document.documentElement.lang = 'id'");
         });
     }
 }

@@ -9,7 +9,7 @@ import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -42,6 +42,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         setAlignItems(FlexComponent.Alignment.CENTER);
         setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
         addClassName("auth-view");
+        getElement().setAttribute("role", "main"); // landmark utama halaman
 
         username.setWidthFull();
         username.setAutofocus(true);
@@ -55,7 +56,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         submit.addClickShortcut(Key.ENTER);
         submit.addClickListener(e -> login());
 
-        PageCard card = new PageCard(new H2("Cashflow"), new Paragraph("Masuk untuk mencatat keuangan Anda."),
+        H1 title = new H1("Cashflow");
+        title.addClassName("auth-title");
+
+        PageCard card = new PageCard(title, new Paragraph("Masuk untuk mencatat keuangan Anda."),
                 username, password, progress, submit, new RouterLink("Belum punya akun? Daftar", RegisterView.class));
         card.addClassName("auth-card");
         add(card);
